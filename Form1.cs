@@ -5165,13 +5165,31 @@
         {
             if (CastingBackground_Check != true)
             {
+                byte partyMemberId = (byte)_ELITEAPIMonitored.Party.GetPartyMembers()
+                .FindIndex(p => p.Name == partyMemberName);
 
-                EliteAPI.ISpell magic = _ELITEAPIPL.Resources.GetSpell(spellName.Trim(), 0);
+                if (partyMemberId == 255) return;
 
-                castingSpell = magic.Name[0];
+                int partySlot = partyMemberId + 1;
 
-                _ELITEAPIPL.ThirdParty.SendString("/ma \"" + castingSpell + "\" " + partyMemberName);
-
+                EliteMMO.API.Keys fKey;
+                switch (partySlot)
+                {
+                    case 1: fKey = EliteMMO.API.Keys.F1; break;
+                    case 2: fKey = EliteMMO.API.Keys.F2; break;
+                    case 3: fKey = EliteMMO.API.Keys.F3; break;
+                    case 4: fKey = EliteMMO.API.Keys.F4; break;
+                    case 5: fKey = EliteMMO.API.Keys.F5; break;
+                    case 6: fKey = EliteMMO.API.Keys.F6; break;
+                    default: return;
+                }
+                
+                _ELITEAPIPL.ThirdParty.SendString("/ma \"" + castingSpell + "\" <st>");
+                Thread.Sleep(250);
+                _ELITEAPIPL.ThirdParty.KeyPress(fKey);
+                Thread.Sleep(50);
+                _ELITEAPIPL.ThirdParty.KeyPress(EliteMMO.API.Keys.RETURN);
+                
                 if (OptionalExtras != null)
                 {
                     currentAction.Text = "Casting: " + castingSpell + " [" + OptionalExtras + "]";
