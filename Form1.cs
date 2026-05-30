@@ -84,6 +84,10 @@
 
         private int lastKnownEstablisherTarget = 0;
 
+        // TRUST VARIABLES
+        private HashSet<string> _trustNames;
+
+
         // BARD SONG VARIABLES
         private int song_casting = 0;
 
@@ -116,7 +120,7 @@
 
         private DateTime DefaultTime = new DateTime(1970, 1, 1);
 
-        private bool curePlease_autofollow = false;
+        private bool curePlease_autofollow = false;  
 
         private List<string> characterNames_naRemoval = new List<string>();
 
@@ -1537,9 +1541,12 @@
             StartPosition = FormStartPosition.CenterScreen;
 
             InitializeComponent();
-
-
-
+            
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "trustnames.txt");
+            _trustNames = File.ReadAllLines(path)
+                .Select(n => n.Trim())
+                .Where(n => !string.IsNullOrEmpty(n))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             currentAction.Text = string.Empty;
 
@@ -5165,12 +5172,59 @@
         {
             if (CastingBackground_Check != true)
             {
-
                 EliteAPI.ISpell magic = _ELITEAPIPL.Resources.GetSpell(spellName.Trim(), 0);
 
                 castingSpell = magic.Name[0];
 
-                _ELITEAPIPL.ThirdParty.SendString("/ma \"" + castingSpell + "\" " + partyMemberName);
+                var members = _ELITEAPIMonitored.Party.GetPartyMembers()
+                    .Where(p => p.Active != 0)
+                    .ToList();
+
+                if (members.Any(p => p.Name == partyMemberName) && _trustNames.Contains(partyMemberName))
+                {
+                    // Force local player to index 0 to match game order
+                    var localName = _ELITEAPIPL.Player.Name;
+                    var localMember = members.FirstOrDefault(p => p.Name == localName);
+                    if (localMember != null)
+                    {
+                        members.Remove(localMember);
+                        members.Insert(0, localMember);
+                    }
+
+                    byte partyMemberId = (byte)members
+                        .FindIndex(p => p.Name == partyMemberName);
+
+                    if (partyMemberId == 255) return;
+
+                    int partySlot = partyMemberId + 1;
+                    EliteMMO.API.Keys fKey = EliteMMO.API.Keys.F1;
+                    switch (partySlot)
+                    {
+                        case 1: fKey = EliteMMO.API.Keys.F1; break;
+                        case 2: fKey = EliteMMO.API.Keys.F2; break;
+                        case 3: fKey = EliteMMO.API.Keys.F3; break;
+                        case 4: fKey = EliteMMO.API.Keys.F4; break;
+                        case 5: fKey = EliteMMO.API.Keys.F5; break;
+                        case 6: fKey = EliteMMO.API.Keys.F6; break;
+                        default: return;
+                    }
+
+                    bool wasAutoFollowing = _ELITEAPIPL.AutoFollow.IsAutoFollowing;
+                    _ELITEAPIPL.AutoFollow.IsAutoFollowing = false;
+
+                    _ELITEAPIPL.ThirdParty.SendString("/ma \"" + spellName + "\" <st>");
+                    Thread.Sleep(250);
+                    _ELITEAPIPL.ThirdParty.KeyPress(fKey);
+                    Thread.Sleep(50);
+                    _ELITEAPIPL.ThirdParty.KeyPress(EliteMMO.API.Keys.RETURN);
+
+                    _ELITEAPIPL.AutoFollow.IsAutoFollowing = wasAutoFollowing;
+                }
+                else
+                {
+                    // handle non-party member
+                    _ELITEAPIPL.ThirdParty.SendString("/ma \"" + castingSpell + "\" " + partyMemberName);
+                }
 
                 if (OptionalExtras != null)
                 {
