@@ -5165,8 +5165,25 @@
         {
             if (CastingBackground_Check != true)
             {
-                byte partyMemberId = (byte)_ELITEAPIMonitored.Party.GetPartyMembers()
-                .FindIndex(p => p.Name == partyMemberName);
+                EliteAPI.ISpell magic = _ELITEAPIPL.Resources.GetSpell(spellName.Trim(), 0);
+
+                castingSpell = magic.Name[0];
+
+                var members = _ELITEAPIMonitored.Party.GetPartyMembers()
+                    .Where(p => p.Active != 0)
+                    .ToList();
+
+                // Force local player to index 0 to match game order
+                var localName = _ELITEAPIPL.Player.Name;
+                var localMember = members.FirstOrDefault(p => p.Name == localName);
+                if (localMember != null)
+                {
+                    members.Remove(localMember);
+                    members.Insert(0, localMember);
+                }
+
+                byte partyMemberId = (byte)members
+                    .FindIndex(p => p.Name == partyMemberName);
 
                 if (partyMemberId == 255) return;
 
@@ -5183,13 +5200,18 @@
                     case 6: fKey = EliteMMO.API.Keys.F6; break;
                     default: return;
                 }
-                
+
+                bool wasAutoFollowing = _ELITEAPIPL.AutoFollow.IsAutoFollowing;
+                _ELITEAPIPL.AutoFollow.IsAutoFollowing = false;
+
                 _ELITEAPIPL.ThirdParty.SendString("/ma \"" + castingSpell + "\" <st>");
                 Thread.Sleep(250);
                 _ELITEAPIPL.ThirdParty.KeyPress(fKey);
                 Thread.Sleep(50);
                 _ELITEAPIPL.ThirdParty.KeyPress(EliteMMO.API.Keys.RETURN);
-                
+
+                _ELITEAPIPL.AutoFollow.IsAutoFollowing = wasAutoFollowing;
+
                 if (OptionalExtras != null)
                 {
                     currentAction.Text = "Casting: " + castingSpell + " [" + OptionalExtras + "]";
